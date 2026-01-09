@@ -32,13 +32,28 @@ class RedBook(BaseParser):
         if not find_res or not find_res.group(1):
             raise ValueError("parse video json info from html fail")
 
-        json_data = yaml.safe_load(find_res.group(1))
+        json_data = yaml.safe_load(find_res.group(1)) or {}
 
-        note_id = json_data["note"]["currentNoteId"]
+        # NOTE: On some server IPs / environments, XHS may return an "anti-bot" state without `note`.
+        # Avoid KeyError and return an actionable message instead.
+        note_block = json_data.get("note") if isinstance(json_data, dict) else None
+        if not isinstance(note_block, dict):
+            keys = list(json_data.keys())[:20] if isinstance(json_data, dict) else []
+            raise Exception(
+                "parse fail: missing `note` in __INITIAL_STATE__ (可能被风控/返回结构变化). "
+                f"top_keys={keys}"
+            )
+
+        note_id = note_block.get("currentNoteId")
         # 验证返回：小红书的分享链接有有效期，过期后会返回 undefined
-        if note_id == "undefined":
-            raise Exception("parse fail: note id in response is undefined")
-        data = json_data["note"]["noteDetailMap"][note_id]["note"]
+        if not note_id or note_id == "undefined":
+            raise Exception("parse fail: note id in response is empty/undefined (链接可能过期)")
+
+        detail_map = note_block.get("noteDetailMap") or {}
+        node = (detail_map.get(note_id) or {}).get("note") if isinstance(detail_map, dict) else None
+        if not isinstance(node, dict):
+            raise Exception("parse fail: missing noteDetailMap[note_id].note (返回结构变化/被拦截)")
+        data = node
 
         # 视频地址
         video_url = ""
@@ -51,12 +66,15 @@ class RedBook(BaseParser):
         # 获取图集图片地址
         images = []
         if len(video_url) <= 0:
-            for img_item in data["imageList"]:
+            for img_item in data.get("imageList", []) or []:
                 # 个别图片有水印, 替换图片域名
-                image_id = img_item["urlDefault"].split("/")[-1].split("!")[0]
+                url_default = img_item.get("urlDefault", "")
+                if not url_default:
+                    continue
+                image_id = url_default.split("/")[-1].split("!")[0]
                 # 如果链接中带有 spectrum/ , 替换域名时需要带上
                 spectrum_str = (
-                    "spectrum/" if "spectrum" in img_item["urlDefault"] else ""
+                    "spectrum/" if "spectrum" in url_default else ""
                 )
                 new_url = (
                     "https://ci.xiaohongshu.com/notes_pre_post/"
@@ -65,9 +83,8 @@ class RedBook(BaseParser):
                 )
                 img_info = ImgInfo(url=new_url)
                 # 如果原图片网址中没有 notes_pre_post 关键字，不支持替换域名，使用原域名
-                if "notes_pre_post" not in img_item["urlDefault"]:
-                    new_url = img_item["urlDefault"]
-                    img_info.url = img_item["urlDefault"]
+                if "notes_pre_post" not in url_default:
+                    img_info.url = url_default
                 # 是否有 livephoto 视频地址
                 if img_item.get("livePhoto", False) and (
                     h264_data := img_item.get("stream", {}).get("h264", [])
@@ -77,13 +94,13 @@ class RedBook(BaseParser):
 
         video_info = VideoInfo(
             video_url=video_url,
-            cover_url=data["imageList"][0]["urlDefault"],
-            title=data["title"],
+            cover_url=(data.get("imageList", [{}])[0] or {}).get("urlDefault", ""),
+            title=data.get("title", ""),
             images=images,
             author=VideoAuthor(
-                uid=data["user"]["userId"],
-                name=data["user"]["nickname"],
-                avatar=data["user"]["avatar"],
+                uid=str((data.get("user") or {}).get("userId", "")),
+                name=(data.get("user") or {}).get("nickname", ""),
+                avatar=(data.get("user") or {}).get("avatar", ""),
             ),
         )
         return video_info
