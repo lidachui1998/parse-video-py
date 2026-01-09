@@ -423,6 +423,38 @@ textarea:focus {
   gap: 10px;
 }
 
+/* History header (title + login/logout buttons) */
+.historyHeader {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.historyHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+#userChip {
+  max-width: 46vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .historyHeader {
+    align-items: flex-start !important;
+  }
+  .historyHeaderActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  #userChip {
+    max-width: 100%;
+  }
+}
+
 .historyItem {
   display: flex;
   gap: 10px;
@@ -432,6 +464,8 @@ textarea:focus {
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(255,255,255,0.04);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 html:not([data-theme="dark"]) .historyItem {
@@ -446,6 +480,7 @@ html:not([data-theme="dark"]) .historyItem {
 .historyItem .t {
   font-weight: 800;
   font-size: 13px;
+  display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -458,6 +493,7 @@ html:not([data-theme="dark"]) .historyItem {
   gap: 10px;
   flex-wrap: nowrap;
   min-width: 0;
+  max-width: 100%;
 }
 
 .historyItem a {
@@ -473,10 +509,45 @@ html:not([data-theme="dark"]) .historyItem {
 .historyItem .url {
   flex: 1 1 auto;
   min-width: 0;
+  display: block;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0.95;
+}
+
+.historyActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 720px) {
+  .historyItem {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .historyItem .left {
+    width: 100%;
+  }
+  .historyItem .m {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .historyItem .meta {
+    opacity: 0.9;
+  }
+  .historyItem .url {
+    width: 100%;
+  }
+  .historyActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 /* Auth pages */

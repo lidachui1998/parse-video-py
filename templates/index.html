@@ -55,15 +55,17 @@
         </div>
 
         <div class="meta" style="margin-top: 14px">
-          <div class="card">
-            <div class="row" style="align-items:center">
+            <div class="card">
+            <div class="row historyHeader" style="align-items:center">
               <h3 style="margin:0">历史记录</h3>
               <div class="spacer"></div>
-              <span class="chip" id="userChip" style="display:none"></span>
-              <a class="btn" id="loginBtn" href="/login" style="display:none">登录</a>
-              <a class="btn" id="registerBtn" href="/register" style="display:none">注册</a>
-              <a class="btn" id="logoutBtn" href="/logout" style="display:none">退出</a>
-              <button class="btn" id="historyRefresh" type="button" style="display:none">刷新</button>
+              <div class="historyHeaderActions">
+                <span class="chip" id="userChip" style="display:none"></span>
+                <a class="btn" id="loginBtn" href="/login" style="display:none">登录</a>
+                <a class="btn" id="registerBtn" href="/register" style="display:none">注册</a>
+                <a class="btn" id="logoutBtn" href="/logout" style="display:none">退出</a>
+                <button class="btn" id="historyRefresh" type="button" style="display:none">刷新</button>
+              </div>
             </div>
             <div id="historyList" class="historyList"></div>
             <p class="muted" style="margin-top:10px">提示：未登录不会记录历史；登录后历史记录按账号隔离。</p>

@@ -1056,9 +1056,7 @@
         left.appendChild(m);
 
         const right = document.createElement("div");
-        right.style.display = "flex";
-        right.style.gap = "8px";
-        right.style.alignItems = "center";
+        right.className = "historyActions";
 
         right.appendChild(
           button(
