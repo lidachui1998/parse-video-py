@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Dict, List
 
-import fake_useragent
+from utils.user_agent import get_user_agent
 
 
 class VideoSource(Enum):
@@ -92,7 +92,7 @@ class BaseParser(ABC):
     @staticmethod
     def get_default_headers() -> Dict[str, str]:
         return {
-            "User-Agent": fake_useragent.UserAgent(os=["ios"]).random,
+            "User-Agent": get_user_agent("ios"),
         }
 
     @abstractmethod

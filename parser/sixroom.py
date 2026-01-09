@@ -1,9 +1,9 @@
-import fake_useragent
 import httpx
 
 from utils import get_val_from_url_by_query_key
 
 from .base import BaseParser, VideoAuthor, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class SixRoom(BaseParser):
@@ -30,7 +30,7 @@ class SixRoom(BaseParser):
         )
         headers = {
             "Referer": f"https://m.6.cn/v/{video_id}",
-            "User-Agent": fake_useragent.UserAgent(os=["ios"]).random,
+            "User-Agent": get_user_agent("ios"),
         }
         async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(req_url, headers=headers)

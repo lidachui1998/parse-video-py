@@ -1,10 +1,10 @@
 import time
 from urllib.parse import urlparse
 
-import fake_useragent
 import httpx
 
 from .base import BaseParser, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class LiShiPin(BaseParser):
@@ -30,7 +30,7 @@ class LiShiPin(BaseParser):
         async with httpx.AsyncClient() as client:
             headers = {
                 "Referer": f"https://www.pearvideo.com/detail_{video_id}",
-                "User-Agent": fake_useragent.UserAgent(os=["windows"]).random,
+                "User-Agent": get_user_agent("windows"),
             }
             response = await client.get(req_url, headers=headers)
 

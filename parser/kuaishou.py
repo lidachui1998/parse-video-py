@@ -1,10 +1,10 @@
 import json
 import re
 
-import fake_useragent
 import httpx
 
 from .base import BaseParser, ImgInfo, VideoAuthor, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class KuaiShou(BaseParser):
@@ -13,7 +13,7 @@ class KuaiShou(BaseParser):
     """
 
     async def parse_share_url(self, share_url: str) -> VideoInfo:
-        user_agent = fake_useragent.UserAgent(os=["ios"]).random
+        user_agent = get_user_agent("ios")
 
         # 获取跳转前的信息, 从中获取跳转url, cookie
         async with httpx.AsyncClient(follow_redirects=False) as client:

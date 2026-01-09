@@ -1,10 +1,10 @@
 import re
 
-import fake_useragent
 import httpx
 import yaml
 
 from .base import BaseParser, ImgInfo, VideoAuthor, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class RedBook(BaseParser):
@@ -14,7 +14,10 @@ class RedBook(BaseParser):
 
     async def parse_share_url(self, share_url: str) -> VideoInfo:
         headers = {
-            "User-Agent": fake_useragent.UserAgent(os=["windows"]).random,
+            # Prefer mobile-ish UA; xhs often serves "undefined" state for desktop/bot traffic.
+            "User-Agent": get_user_agent("ios"),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
         async with httpx.AsyncClient(follow_redirects=True) as client:
             response = await client.get(share_url, headers=headers)

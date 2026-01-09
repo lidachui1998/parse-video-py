@@ -1,7 +1,7 @@
 import json
 import re
 
-import fake_useragent
+from utils.user_agent import get_user_agent
 import httpx
 
 from .base import BaseParser, VideoAuthor, VideoInfo
@@ -14,7 +14,7 @@ class XiGua(BaseParser):
 
     async def parse_share_url(self, share_url: str) -> VideoInfo:
         headers = {
-            "User-Agent": fake_useragent.UserAgent(os=["android"]).random,
+            "User-Agent": get_user_agent("android"),
         }
         if share_url.startswith("https://www.ixigua.com/"):
             # 支持电脑网页版链接 https://www.ixigua.com/xxxxxx

@@ -8,6 +8,7 @@ WORKDIR /app
 COPY ./parser /app/parser
 COPY ./templates /app/templates
 COPY ./utils /app/utils
+COPY ./static /app/static
 COPY ./requirements.txt /app/
 COPY ./main.py /app/
 

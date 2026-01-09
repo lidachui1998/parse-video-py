@@ -1,12 +1,12 @@
 import json
 import re
 
-import fake_useragent
 import httpx
 
 from utils import get_val_from_url_by_query_key
 
 from .base import BaseParser, VideoAuthor, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class QuanMinKGe(BaseParser):
@@ -22,7 +22,7 @@ class QuanMinKGe(BaseParser):
         req_url = f"https://kg.qq.com/node/play?s={video_id}"
         async with httpx.AsyncClient() as client:
             headers = {
-                "User-Agent": fake_useragent.UserAgent(os="windows").random,
+                "User-Agent": get_user_agent("windows"),
             }
             response = await client.get(req_url, headers=headers)
             response.raise_for_status()

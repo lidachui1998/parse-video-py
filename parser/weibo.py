@@ -1,12 +1,12 @@
 import re
 from urllib.parse import urlparse
 
-import fake_useragent
 import httpx
 
 from utils import get_val_from_url_by_query_key
 
 from .base import BaseParser, ImgInfo, VideoAuthor, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class WeiBo(BaseParser):
@@ -39,7 +39,7 @@ class WeiBo(BaseParser):
         headers = {
             "Referer": f"https://h5.video.weibo.com/show/{video_id}",
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": fake_useragent.UserAgent(os=["ios"]).random,
+            "User-Agent": get_user_agent("ios"),
         }
         post_content = 'data={"Component_Play_Playinfo":{"oid":"' + video_id + '"}}'
         async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -74,7 +74,7 @@ class WeiBo(BaseParser):
         # Try mobile API first
         req_url = f"https://m.weibo.cn/statuses/show?id={post_id}"
         headers = {
-            "User-Agent": fake_useragent.UserAgent(os=["ios"]).random,
+            "User-Agent": get_user_agent("ios"),
             "Referer": "https://m.weibo.cn/",
             "Content-Type": "application/json;charset=UTF-8",
             "X-Requested-With": "XMLHttpRequest",
@@ -93,7 +93,7 @@ class WeiBo(BaseParser):
 
         # Fallback to desktop page parsing using the original URL
         headers = {
-            "User-Agent": fake_useragent.UserAgent(os=["ios"]).random,
+            "User-Agent": get_user_agent("ios"),
         }
 
         async with httpx.AsyncClient(follow_redirects=True) as client:

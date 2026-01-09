@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  parse-video-py:
+    # Option A (recommended if you modified the code): build locally
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: parse-video-py:local
+
+    # Option B (use upstream image): comment out build/image above and uncomment below
+    # image: wujunwei928/parse-video-py:latest
+
+    container_name: parse-video-py
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+    # Optional: enable basic auth
+    # environment:
+    #   PARSE_VIDEO_USERNAME: "username"
+    #   PARSE_VIDEO_PASSWORD: "password"

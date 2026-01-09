@@ -108,6 +108,49 @@ docker run -d -p 8000:8000 wujunwei928/parse-video-py
 docker run -d -p 8000:8000 -e PARSE_VIDEO_USERNAME=username -e PARSE_VIDEO_PASSWORD=password wujunwei928/parse-video-py
 ```
 
+### 自己构建镜像（推荐：改过前端/代码时）
+在项目根目录执行：
+
+```bash
+docker build -t parse-video-py:local .
+docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped parse-video-py:local
+```
+
+如需开启 basic auth：
+
+```bash
+docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped ^
+  -e PARSE_VIDEO_USERNAME=username ^
+  -e PARSE_VIDEO_PASSWORD=password ^
+  parse-video-py:local
+```
+
+### docker-compose 一键部署
+项目根目录已提供 `docker-compose.yml`，直接运行：
+
+```bash
+docker compose up -d --build
+```
+
+访问：`http://127.0.0.1:8000/`
+
+### 从你自己的 GitHub 仓库构建镜像（打你自己的 Docker 包）
+方式 1：先 clone 再 build（最常用）：
+
+```bash
+git clone <你的仓库地址>
+cd <你的仓库目录>
+docker build -t parse-video-py:local .
+docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped parse-video-py:local
+```
+
+方式 2：不 clone，直接从 GitHub URL 构建（Docker 支持 remote context）：
+
+```bash
+docker build -t parse-video-py:local <你的仓库地址>
+docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped parse-video-py:local
+```
+
 # 查看前端页面
 访问: http://127.0.0.1:8000/
 

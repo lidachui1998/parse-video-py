@@ -1,9 +1,9 @@
 from urllib.parse import urlparse
 
-import fake_useragent
 import httpx
 
 from .base import BaseParser, VideoInfo
+from utils.user_agent import get_user_agent
 
 
 class PiPiGaoXiao(BaseParser):
@@ -26,7 +26,7 @@ class PiPiGaoXiao(BaseParser):
             headers = {
                 "Referer": req_url,
                 "Content-Type": "text/plain;charset=UTF-8",
-                "User-Agent": fake_useragent.UserAgent(os=["windows"]).random,
+                "User-Agent": get_user_agent("windows"),
             }
             # pid需要是数字，这里直接拼接json字符串，不用json.dumps
             post_content = '{"pid":' + video_id + ',"type":"post","mid":null}'
