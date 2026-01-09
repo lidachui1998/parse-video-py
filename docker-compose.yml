@@ -22,7 +22,7 @@ services:
     labels:
       watchcow.enable: "true"
       watchcow.display_name: "视频解析"
-      watchcow.desc: "轻量级笔记应用"
+      watchcow.desc: "自建视频无水印解析下载，支持抖音 / 小红书 / 快手 / B站 / 微博 等主流平台（共 20+）"
       watchcow.service_port: "6123"
       watchcow.protocol: "http"
       watchcow.path: "/"
