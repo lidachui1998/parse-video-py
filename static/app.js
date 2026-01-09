@@ -1045,14 +1045,10 @@
         m.className = "m";
         m.innerHTML = "";
         const meta = document.createElement("span");
+        meta.className = "meta";
         meta.textContent = `${fmtTime(it.created_at)} · ${it.kind || ""}`.trim();
         const url = document.createElement("span");
-        url.className = "mono";
-        url.style.opacity = "0.95";
-        url.style.maxWidth = "100%";
-        url.style.whiteSpace = "nowrap";
-        url.style.overflow = "hidden";
-        url.style.textOverflow = "ellipsis";
+        url.className = "url mono";
         url.textContent = it.share_url || "";
         m.appendChild(meta);
         if (it.share_url) m.appendChild(url);
