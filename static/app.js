@@ -601,7 +601,19 @@
       vv.className = "v";
 
       if (String(v).startsWith("http")) {
-        vv.appendChild(linkButton("打开链接", v, { className: "primary" }));
+        // Many media URLs require Referer; provide a proxied open option for better compatibility.
+        const shouldProxyOpen = ["作者头像", "封面", "视频", "音乐"].includes(k);
+        if (shouldProxyOpen) {
+          vv.appendChild(
+            linkButton("打开(代理)", toProxy(v, guessReferer(v)), {
+              className: "primary",
+              target: "_blank",
+            })
+          );
+          vv.appendChild(linkButton("打开原链接", v));
+        } else {
+          vv.appendChild(linkButton("打开链接", v, { className: "primary" }));
+        }
         vv.appendChild(
           button("复制", async () => {
             const ok = await copyText(v);
@@ -626,9 +638,17 @@
 
     if (data.cover_url) {
       actionsRow.appendChild(
-        linkButton("下载封面", data.cover_url, {
-          download: "cover",
-          referrerPolicy: "no-referrer",
+        button("下载封面", async () => {
+          try {
+            await downloadFromUrl(data.cover_url, `cover.${extFromUrl(data.cover_url, "jpg")}`);
+          } catch (e) {
+            toast("error", "下载失败", safeText(e && e.message) || "未知错误", 3800);
+          }
+        })
+      );
+      actionsRow.appendChild(
+        linkButton("打开封面(代理)", toProxy(data.cover_url, guessReferer(data.cover_url)), {
+          className: "primary",
         })
       );
     }
