@@ -43,34 +43,42 @@ class RedBook(BaseParser):
         return ""
 
     async def parse_share_url(self, share_url: str) -> VideoInfo:
-        headers = {
-            # Prefer mobile-ish UA; xhs often serves "undefined" state for desktop/bot traffic.
-            "User-Agent": get_user_agent("ios"),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        }
-        # Optional cookie to reduce anti-bot issues on server IPs (set in docker env)
+        # IMPORTANT:
+        # Upstream repo uses a Windows UA and is observed to work better on some server IPs.
+        # We'll try Windows UA first, then fallback to iOS UA.
         xhs_cookie = os.getenv("XHS_COOKIE") or os.getenv("RED_BOOK_COOKIE") or ""
-        if xhs_cookie:
-            headers["Cookie"] = xhs_cookie
+
+        def _headers(os_hint: str) -> dict:
+            h = {"User-Agent": get_user_agent(os_hint)}
+            if xhs_cookie:
+                h["Cookie"] = xhs_cookie
+            return h
 
         final_url = share_url
         # First hop: many xhslink.com urls 302 to an explore/discovery URL containing note_id.
         async with httpx.AsyncClient(follow_redirects=False) as client:
-            r0 = await client.get(share_url, headers=headers)
+            r0 = await client.get(share_url, headers=_headers("windows"))
             if r0.status_code in (301, 302, 303, 307, 308):
                 final_url = r0.headers.get("location") or share_url
 
+        # Try fetch with Windows UA first; if it looks like anti-bot (missing __INITIAL_STATE__/note),
+        # fallback to iOS UA.
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(final_url, headers=headers)
+            response = await client.get(final_url, headers=_headers("windows"))
             response.raise_for_status()
             landed_url = str(response.url)
 
-        pattern = re.compile(
-            pattern=r"window\.__INITIAL_STATE__\s*=\s*(.*?)</script>",
-            flags=re.DOTALL,
-        )
-        find_res = pattern.search(response.text)
+            pattern = re.compile(
+                pattern=r"window\.__INITIAL_STATE__\s*=\s*(.*?)</script>",
+                flags=re.DOTALL,
+            )
+            find_res = pattern.search(response.text)
+            if not find_res or not find_res.group(1):
+                # fallback attempt
+                response = await client.get(final_url, headers=_headers("ios"))
+                response.raise_for_status()
+                landed_url = str(response.url)
+                find_res = pattern.search(response.text)
 
         if not find_res or not find_res.group(1):
             raise ValueError("parse video json info from html fail")

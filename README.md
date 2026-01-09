@@ -134,6 +134,10 @@ docker compose up -d --build
 
 访问：`http://127.0.0.1:8000/`
 
+如需提高小红书（XHS）在服务器上的解析成功率（机房 IP 易触发风控），可在 `docker-compose.yml` 中配置：
+
+- `XHS_COOKIE`: 浏览器登录小红书后的 Cookie 字符串（不配置则完全匿名，可能被返回 `fakeModal/noteData` 导致解析失败）
+
 ### 从你自己的 GitHub 仓库构建镜像（打你自己的 Docker 包）
 方式 1：先 clone 再 build（最常用）：
 

@@ -20,3 +20,8 @@ services:
     # environment:
     #   PARSE_VIDEO_USERNAME: "username"
     #   PARSE_VIDEO_PASSWORD: "password"
+
+    # Optional: XHS (小红书) anti-bot mitigation
+    # If your server IP is blocked, set a logged-in browser cookie here.
+    # environment:
+    #   XHS_COOKIE: "your xiaohongshu cookie string"
