@@ -2,8 +2,7 @@ name: Build and push Docker image (GHCR)
 
 on:
   push:
-    branches: ["main", "master"]
-    tags: ["v*"]
+    tags: ["*"]
 
 permissions:
   contents: read
@@ -32,5 +31,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
