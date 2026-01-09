@@ -2,6 +2,7 @@ import re
 
 import httpx
 import yaml
+import os
 
 from .base import BaseParser, ImgInfo, VideoAuthor, VideoInfo
 from utils.user_agent import get_user_agent
@@ -12,6 +13,35 @@ class RedBook(BaseParser):
     小红书
     """
 
+    @staticmethod
+    def _extract_note_id_from_url(url: str) -> str:
+        """
+        XHS note id is usually a 24-char hex string in URL path.
+        Examples:
+          - https://www.xiaohongshu.com/explore/<note_id>
+          - https://www.xiaohongshu.com/discovery/item/<note_id>
+        """
+        if not url:
+            return ""
+        m = re.search(r"/([0-9a-fA-F]{24})(?:[/?#]|$)", url)
+        return m.group(1) if m else ""
+
+    @staticmethod
+    def _extract_note_id_from_text(html: str) -> str:
+        if not html:
+            return ""
+        # common embeds
+        for pat in [
+            r'"noteId"\s*:\s*"([0-9a-fA-F]{24})"',
+            r'"currentNoteId"\s*:\s*"([0-9a-fA-F]{24})"',
+            r'"sourceNoteId"\s*:\s*"([0-9a-fA-F]{24})"',
+            r'"note_id"\s*:\s*"([0-9a-fA-F]{24})"',
+        ]:
+            m = re.search(pat, html)
+            if m:
+                return m.group(1)
+        return ""
+
     async def parse_share_url(self, share_url: str) -> VideoInfo:
         headers = {
             # Prefer mobile-ish UA; xhs often serves "undefined" state for desktop/bot traffic.
@@ -19,9 +49,22 @@ class RedBook(BaseParser):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
+        # Optional cookie to reduce anti-bot issues on server IPs (set in docker env)
+        xhs_cookie = os.getenv("XHS_COOKIE") or os.getenv("RED_BOOK_COOKIE") or ""
+        if xhs_cookie:
+            headers["Cookie"] = xhs_cookie
+
+        final_url = share_url
+        # First hop: many xhslink.com urls 302 to an explore/discovery URL containing note_id.
+        async with httpx.AsyncClient(follow_redirects=False) as client:
+            r0 = await client.get(share_url, headers=headers)
+            if r0.status_code in (301, 302, 303, 307, 308):
+                final_url = r0.headers.get("location") or share_url
+
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            response = await client.get(share_url, headers=headers)
+            response = await client.get(final_url, headers=headers)
             response.raise_for_status()
+            landed_url = str(response.url)
 
         pattern = re.compile(
             pattern=r"window\.__INITIAL_STATE__\s*=\s*(.*?)</script>",
@@ -33,27 +76,69 @@ class RedBook(BaseParser):
             raise ValueError("parse video json info from html fail")
 
         json_data = yaml.safe_load(find_res.group(1)) or {}
+        note_id_hint = self._extract_note_id_from_url(landed_url) or self._extract_note_id_from_text(response.text)
 
         # NOTE: On some server IPs / environments, XHS may return an "anti-bot" state without `note`.
         # Avoid KeyError and return an actionable message instead.
         note_block = json_data.get("note") if isinstance(json_data, dict) else None
         if not isinstance(note_block, dict):
-            keys = list(json_data.keys())[:20] if isinstance(json_data, dict) else []
-            raise Exception(
-                "parse fail: missing `note` in __INITIAL_STATE__ (可能被风控/返回结构变化). "
-                f"top_keys={keys}"
-            )
+            # Fallback: some versions use `noteData` instead of `note`
+            note_data = json_data.get("noteData") if isinstance(json_data, dict) else None
+            if isinstance(note_data, dict):
+                # try common shapes
+                # - noteData.noteDetailMap[note_id].note
+                # - noteData.noteDetail.note
+                note_id = (
+                    note_data.get("currentNoteId")
+                    or note_data.get("noteId")
+                    or (note_data.get("noteDetail") or {}).get("noteId")
+                    or note_id_hint
+                )
+                if note_id and note_id != "undefined":
+                    detail_map = note_data.get("noteDetailMap") or {}
+                    node = (detail_map.get(note_id) or {}).get("note") if isinstance(detail_map, dict) else None
+                    if isinstance(node, dict):
+                        data = node
+                    else:
+                        nd = note_data.get("noteDetail") or {}
+                        data = nd.get("note") if isinstance(nd, dict) else None
+                    if isinstance(data, dict):
+                        # reuse the rest of parsing logic by setting `note_block`-like variables
+                        pass
+                    else:
+                        keys = list(json_data.keys())[:20] if isinstance(json_data, dict) else []
+                        raise Exception(
+                            "parse fail: xhs __INITIAL_STATE__ has noteData but unsupported shape "
+                            f"(可能被风控/返回结构变化). top_keys={keys}"
+                        )
+                else:
+                    keys = list(json_data.keys())[:20] if isinstance(json_data, dict) else []
+                    raise Exception(
+                        "parse fail: xhs __INITIAL_STATE__ has noteData but missing note_id "
+                        f"(可能被风控/需要登录态/链接过期). top_keys={keys}. "
+                        "建议：在服务器/Docker 设置环境变量 XHS_COOKIE=浏览器登录后的小红书 Cookie"
+                    )
+            else:
+                keys = list(json_data.keys())[:20] if isinstance(json_data, dict) else []
+                raise Exception(
+                    "parse fail: missing `note` in __INITIAL_STATE__ (可能被风控/返回结构变化). "
+                    f"top_keys={keys}"
+                )
+        else:
+            note_id = note_block.get("currentNoteId") or note_id_hint
+            # 验证返回：小红书的分享链接有有效期，过期后会返回 undefined
+            if not note_id or note_id == "undefined":
+                raise Exception("parse fail: note id in response is empty/undefined (链接可能过期)")
 
-        note_id = note_block.get("currentNoteId")
-        # 验证返回：小红书的分享链接有有效期，过期后会返回 undefined
-        if not note_id or note_id == "undefined":
-            raise Exception("parse fail: note id in response is empty/undefined (链接可能过期)")
+            detail_map = note_block.get("noteDetailMap") or {}
+            node = (detail_map.get(note_id) or {}).get("note") if isinstance(detail_map, dict) else None
+            if not isinstance(node, dict):
+                raise Exception("parse fail: missing noteDetailMap[note_id].note (返回结构变化/被拦截)")
+            data = node
 
-        detail_map = note_block.get("noteDetailMap") or {}
-        node = (detail_map.get(note_id) or {}).get("note") if isinstance(detail_map, dict) else None
-        if not isinstance(node, dict):
-            raise Exception("parse fail: missing noteDetailMap[note_id].note (返回结构变化/被拦截)")
-        data = node
+        # if we reached here, `data` should be a dict (either from note or noteData)
+        if not isinstance(data, dict):
+            raise Exception("parse fail: unable to locate note data (可能被风控/返回结构变化)")
 
         # 视频地址
         video_url = ""
