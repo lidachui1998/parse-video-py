@@ -2,24 +2,40 @@ version: "3.8"
 
 services:
   parse-video-py:
-    # Option A (recommended if you modified the code): build locally
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: parse-video-py:local
+    # Default: pull image built by GitHub Actions (GHCR)
+    # You can override via environment variable GHCR_IMAGE.
+    image: ghcr.io/lidachui1998/parse-video-py:latest
+    pull_policy: always
 
-    # Option B (use upstream image): comment out build/image above and uncomment below
-    # image: wujunwei928/parse-video-py:latest
+    # Optional: build locally (uncomment to use local Dockerfile build)
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
 
     container_name: parse-video-py
     ports:
       - "8000:8000"
     restart: unless-stopped
-
+    volumes:
+      # Persist history DB (SQLite)
+      - ./data:/app/data
+    labels:
+      watchcow.enable: "true"
+      watchcow.display_name: "视频解析"
+      watchcow.desc: "轻量级笔记应用"
+      watchcow.service_port: "6123"
+      watchcow.protocol: "http"
+      watchcow.path: "/"
+      watchcow.icon: "https://r2.bjca.xyz/video-parse.png"
     # Optional: enable basic auth
+    # Optional: session secret + session expiry (recommended in production)
     # environment:
-    #   PARSE_VIDEO_USERNAME: "username"
-    #   PARSE_VIDEO_PASSWORD: "password"
+    #   # Prefer SESSION_SECRET_KEY; PARSE_VIDEO_SECRET is kept for backward compatibility.
+    #   SESSION_SECRET_KEY: "change-me-to-a-long-random-string"
+    #   # Default is 30 days (2592000). Set to e.g. 86400 for 1 day.
+    #   SESSION_MAX_AGE_SECONDS: "2592000"
+    #   # Optional: customize DB path
+    #   # PARSE_VIDEO_DB_PATH: "data/parse_video.db"
 
     # Optional: XHS (小红书) anti-bot mitigation
     # If your server IP is blocked, set a logged-in browser cookie here.

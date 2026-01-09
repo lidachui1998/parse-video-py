@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <title>{{ title }}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="container authShell">
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"><img src="/static/logo.svg" alt="" /></div>
+          <div style="min-width: 0">
+            <h1>注册</h1>
+            <p class="authHint">创建账号后即可使用历史记录</p>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn" href="/login">去登录</a>
+        </div>
+      </div>
+
+      <div class="card authCard">
+        {% if error %}
+        <div class="toast error" style="position: static; margin-bottom: 12px">
+          <div class="dot"></div>
+          <div class="t">
+            <b>注册失败</b>
+            <p>{{ error }}</p>
+          </div>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/register">
+          <div class="kv">
+            <div class="item">
+              <div class="k">用户名</div>
+              <div class="v"><input name="username" required minlength="3" style="width: 100%" /></div>
+            </div>
+            <div class="item">
+              <div class="k">密码</div>
+              <div class="v">
+                <div class="pwWrap">
+                  <input name="password" type="password" required minlength="6" data-pw="1" autocomplete="new-password" />
+                  <button class="pwToggle" type="button" aria-label="显示密码">显示</button>
+                </div>
+              </div>
+            </div>
+            <div class="item">
+              <div class="k">确认密码</div>
+              <div class="v">
+                <div class="pwWrap">
+                  <input name="password2" type="password" required minlength="6" data-pw="1" autocomplete="new-password" />
+                  <button class="pwToggle" type="button" aria-label="显示密码">显示</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row" style="margin-top: 14px">
+            <button class="btn primary" type="submit">注册并登录</button>
+            <a class="btn" href="/">返回首页</a>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script src="/static/auth.js"></script>
+  </body>
+</html>
+

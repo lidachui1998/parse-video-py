@@ -129,7 +129,7 @@ docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped ^
 项目根目录已提供 `docker-compose.yml`，直接运行：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 访问：`http://127.0.0.1:8000/`
@@ -137,6 +137,17 @@ docker compose up -d --build
 如需提高小红书（XHS）在服务器上的解析成功率（机房 IP 易触发风控），可在 `docker-compose.yml` 中配置：
 
 - `XHS_COOKIE`: 浏览器登录小红书后的 Cookie 字符串（不配置则完全匿名，可能被返回 `fakeModal/noteData` 导致解析失败）
+
+### 登录 / 注册 与历史记录
+- **登录/注册**：访问页面右上角/历史记录区域的“登录/注册”，会进入登录/注册页面（会话 Cookie）。
+- **历史记录规则**：
+  - **未登录：不记录历史**
+  - **已登录：按账号隔离历史**
+- **数据存储**：
+  - SQLite：默认路径 `data/parse_video.db`（可用 `PARSE_VIDEO_DB_PATH` 自定义）
+  - `docker-compose.yml` 已默认挂载 `./data:/app/data`，容器重启/更新不会丢历史
+- **建议**：
+- 生产环境建议设置 `SESSION_SECRET_KEY`（或旧版兼容的 `PARSE_VIDEO_SECRET`），否则服务重启会话会失效；默认登录有效期为 30 天，可用 `SESSION_MAX_AGE_SECONDS` 调整
 
 ### 从你自己的 GitHub 仓库构建镜像（打你自己的 Docker 包）
 方式 1：先 clone 再 build（最常用）：

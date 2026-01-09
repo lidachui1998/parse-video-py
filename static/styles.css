@@ -1,3 +1,12 @@
+.historyItem {
+  gap: 14px;
+}
+.historyItem .t {
+  line-height: 1.25;
+}
+.historyItem .m {
+  line-height: 1.25;
+}
 /* Modern, responsive UI for parse-video-py (no build step) */
 :root {
   --bg: #0b0f1a;
@@ -407,6 +416,116 @@ textarea:focus {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+
+.historyList {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.historyItem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+}
+
+html:not([data-theme="dark"]) .historyItem {
+  border-color: rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.03);
+}
+
+.historyItem .left {
+  min-width: 0;
+}
+.historyItem .t {
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.historyItem .m {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.78;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.historyItem a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Auth pages */
+.authShell {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.authCard {
+  margin-top: 18px;
+}
+.authHint {
+  margin-top: 6px;
+  opacity: 0.82;
+  font-size: 12px;
+}
+.kv input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.22);
+  color: var(--text);
+  outline: none;
+}
+html:not([data-theme="dark"]) .kv input {
+  border-color: rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.85);
+  color: var(--text);
+}
+.kv input:focus {
+  border-color: rgba(118, 192, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(118, 192, 255, 0.18);
+}
+
+.pwWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pwWrap input {
+  padding-right: 58px;
+}
+.pwToggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(0,0,0,0.18);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+html:not([data-theme="dark"]) .pwToggle {
+  border-color: rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.72);
+}
+.pwToggle:active {
+  transform: translateY(-50%) scale(0.98);
+}
+
 
 @media (max-width: 720px) {
   .gallery {

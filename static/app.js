@@ -41,6 +41,12 @@
     lbDlImg: $("#lbDlImg"),
     lbDlLive: $("#lbDlLive"),
     themeBtn: $("#themeBtn"),
+    historyList: $("#historyList"),
+    historyRefresh: $("#historyRefresh"),
+    userChip: $("#userChip"),
+    loginBtn: $("#loginBtn"),
+    registerBtn: $("#registerBtn"),
+    logoutBtn: $("#logoutBtn"),
   };
 
   function setBusy(v) {
@@ -971,11 +977,133 @@
     if (Array.isArray(data.images) && data.images.length) hint.push(`图集：${data.images.length} 张`);
     el.quickSubtitle.textContent = hint.join(" · ") || "字段可能为空（不同平台返回不同）";
 
+    const hasImages = Array.isArray(data.images) && data.images.length > 0;
+    const hasVideo = !!data.video_url;
+
     renderKV(data);
 
-    renderVideo(data);
+    // If this is an album-only result, some platforms return a cover_url that is hotlink-blocked,
+    // while the actual image URLs are accessible. Prefer the first image as cover preview.
+    const videoData = hasImages && !hasVideo ? { ...data, cover_url: data.images[0].url } : data;
+
+    renderVideo(videoData);
     renderImages(data);
-    setTab(data.video_url || data.cover_url ? "video" : "images");
+
+    // Default tab: prefer album when there is no video.
+    const defaultTab = hasVideo ? "video" : hasImages ? "images" : data.cover_url ? "video" : "images";
+    setTab(defaultTab);
+  }
+
+  function fmtTime(s) {
+    try {
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return safeText(s);
+      return d.toLocaleString();
+    } catch {
+      return safeText(s);
+    }
+  }
+
+  async function getMe() {
+    try {
+      const res = await fetch("/api/me");
+      const json = await res.json();
+      if (json && json.code === 200 && json.data) return json.data;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadHistory() {
+    if (!el.historyList) return;
+    el.historyList.textContent = "加载中…";
+    try {
+      const res = await fetch("/api/history?limit=50");
+      const json = await res.json();
+      if (!json || json.code === 401 || res.status === 401) {
+        el.historyList.innerHTML =
+          `<div class="muted">登录后才会记录历史。你可以先 <a href="/login">登录</a> 或 <a href="/register">注册</a>。</div>`;
+        return;
+      }
+      if (!json || json.code !== 200) throw new Error((json && json.msg) || `HTTP ${res.status}`);
+      const items = json.data || [];
+      if (!items.length) {
+        el.historyList.innerHTML = `<div class="muted">暂无历史记录。</div>`;
+        return;
+      }
+      el.historyList.innerHTML = "";
+      for (const it of items) {
+        const node = document.createElement("div");
+        node.className = "historyItem";
+        const left = document.createElement("div");
+        left.className = "left";
+        const t = document.createElement("div");
+        t.className = "t";
+        t.textContent = it.title || it.share_url || `记录 #${it.id}`;
+        const m = document.createElement("div");
+        m.className = "m";
+        m.innerHTML = "";
+        const meta = document.createElement("span");
+        meta.textContent = `${fmtTime(it.created_at)} · ${it.kind || ""}`.trim();
+        const url = document.createElement("span");
+        url.className = "mono";
+        url.style.opacity = "0.95";
+        url.style.maxWidth = "100%";
+        url.style.whiteSpace = "nowrap";
+        url.style.overflow = "hidden";
+        url.style.textOverflow = "ellipsis";
+        url.textContent = it.share_url || "";
+        m.appendChild(meta);
+        if (it.share_url) m.appendChild(url);
+        left.appendChild(t);
+        left.appendChild(m);
+
+        const right = document.createElement("div");
+        right.style.display = "flex";
+        right.style.gap = "8px";
+        right.style.alignItems = "center";
+
+        right.appendChild(
+          button(
+            "查看",
+            async () => {
+              try {
+                const r = await fetch(`/api/history/${it.id}`);
+                const j = await r.json();
+                if (!j || j.code !== 200) throw new Error((j && j.msg) || `HTTP ${r.status}`);
+                if (j.data && j.data.data) render(j.data.data);
+              } catch (e) {
+                toast("error", "打开失败", safeText(e && e.message) || "未知错误", 4200);
+              }
+            },
+            "mini primary"
+          )
+        );
+        right.appendChild(
+          button(
+            "删除",
+            async () => {
+              try {
+                const r = await fetch(`/api/history/${it.id}`, { method: "DELETE" });
+                const j = await r.json();
+                if (!j || (j.code !== 200 && j.code !== 404)) throw new Error((j && j.msg) || `HTTP ${r.status}`);
+                await loadHistory();
+              } catch (e) {
+                toast("error", "删除失败", safeText(e && e.message) || "未知错误", 4200);
+              }
+            },
+            "mini"
+          )
+        );
+
+        node.appendChild(left);
+        node.appendChild(right);
+        el.historyList.appendChild(node);
+      }
+    } catch (e) {
+      el.historyList.innerHTML = `<div class="muted">加载失败：${safeText(e && e.message) || "未知错误"}</div>`;
+    }
   }
 
   async function parse() {
@@ -999,6 +1127,7 @@
       const json = await res.json();
       if (json && json.code === 200 && json.data) {
         render(json.data);
+        loadHistory().catch(() => {});
       } else {
         toast("error", "解析失败", safeText(json && json.msg) || "未知错误", 4200);
       }
@@ -1148,9 +1277,23 @@
   );
 
   el.themeBtn.addEventListener("click", toggleTheme);
+  el.historyRefresh?.addEventListener("click", () => loadHistory());
 
   // init
   setTheme(localStorage.getItem("pv_theme") || "system");
   setTab("video");
+  (async () => {
+    const me = await getMe();
+    const loggedIn = !!me;
+    if (el.userChip) {
+      el.userChip.style.display = loggedIn ? "" : "none";
+      el.userChip.textContent = loggedIn ? `已登录：${me.username}` : "";
+    }
+    if (el.loginBtn) el.loginBtn.style.display = loggedIn ? "none" : "";
+    if (el.registerBtn) el.registerBtn.style.display = loggedIn ? "none" : "";
+    if (el.logoutBtn) el.logoutBtn.style.display = loggedIn ? "" : "none";
+    if (el.historyRefresh) el.historyRefresh.style.display = loggedIn ? "" : "none";
+    await loadHistory();
+  })().catch(() => {});
 })();
 

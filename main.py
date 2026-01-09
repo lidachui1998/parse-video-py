@@ -1,20 +1,24 @@
 import os
 import re
 import secrets
+from datetime import datetime, timezone
 from ipaddress import ip_address
 from urllib.parse import urlparse
 
 import httpx
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, PlainTextResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
 from utils.user_agent import get_user_agent
+from utils.auth_db import User, create_user, get_user_by_id, verify_user
+from utils.history_db import delete_history_item, get_history_item, init_db, insert_history, list_history
 try:
     # Optional dependency (MCP support). Allow the web UI to run even if it's missing.
     from fastapi_mcp import FastApiMCP  # type: ignore
@@ -34,41 +38,42 @@ templates = Jinja2Templates(directory="templates")
 # static assets (css/js/icons)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+@app.on_event("startup")
+async def _startup():
+    init_db()
 
-def get_auth_dependency() -> list[Depends]:
-    """
-    根据环境变量动态返回 Basic Auth 依赖项
-    - 如果设置了 USERNAME 和 PASSWORD，返回验证函数
-    - 如果未设置，返回一个直接返回 None 的 Depends
-    """
-    basic_auth_username = os.getenv("PARSE_VIDEO_USERNAME")
-    basic_auth_password = os.getenv("PARSE_VIDEO_PASSWORD")
-
-    if not (basic_auth_username and basic_auth_password):
-        return []  # 返回包含Depends实例的列表
-
-    security = HTTPBasic()
-
-    def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
-        # 验证凭据
-        correct_username = secrets.compare_digest(
-            credentials.username, basic_auth_username
-        )
-        correct_password = secrets.compare_digest(
-            credentials.password, basic_auth_password
-        )
-        if not (correct_username and correct_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Basic"},
-            )
-        return credentials
-
-    return [Depends(verify_credentials)]  # 返回封装好的 Depends
+# Session config
+# - secret_key: use env var so restarts don't invalidate existing sessions
+# - max_age: default 30 days
+_secret = os.getenv("SESSION_SECRET_KEY") or os.getenv("PARSE_VIDEO_SECRET") or secrets.token_urlsafe(32)
+_max_age = int(os.getenv("SESSION_MAX_AGE_SECONDS") or str(30 * 24 * 60 * 60))
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=_secret,
+    same_site="lax",
+    https_only=False,
+    max_age=_max_age,
+)
 
 
-@app.get("/", response_class=HTMLResponse, dependencies=get_auth_dependency())
+def get_current_user(request: Request) -> User | None:
+    uid = request.session.get("user_id") if hasattr(request, "session") else None
+    if not uid:
+        return None
+    try:
+        return get_user_by_id(int(uid))
+    except Exception:
+        return None
+
+
+def require_user(request: Request) -> User:
+    u = get_current_user(request)
+    if not u:
+        raise HTTPException(status_code=401, detail="Login required")
+    return u
+
+
+@app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
     return templates.TemplateResponse(
         request=request,
@@ -77,6 +82,84 @@ async def read_item(request: Request):
             "title": "parse-video-py",
         },
     )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"title": "登录"},
+    )
+
+
+@app.post("/login")
+async def login_action(request: Request):
+    form = await request.form()
+    username = str(form.get("username") or "").strip()
+    password = str(form.get("password") or "")
+    u = verify_user(username, password)
+    if not u:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={"title": "登录", "error": "账号或密码不正确"},
+            status_code=400,
+        )
+    request.session["user_id"] = u.id
+    request.session["username"] = u.username
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"title": "注册"},
+    )
+
+
+@app.post("/register")
+async def register_action(request: Request):
+    form = await request.form()
+    username = str(form.get("username") or "").strip()
+    password = str(form.get("password") or "")
+    password2 = str(form.get("password2") or "")
+    if password != password2:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"title": "注册", "error": "两次密码不一致"},
+            status_code=400,
+        )
+    try:
+        created_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        u = create_user(username, password, created_at=created_at)
+    except Exception as e:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"title": "注册", "error": str(e)},
+            status_code=400,
+        )
+    request.session["user_id"] = u.id
+    request.session["username"] = u.username
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/api/me")
+async def api_me(request: Request):
+    u = get_current_user(request)
+    if not u:
+        return {"code": 401, "msg": "not logged in"}
+    return {"code": 200, "msg": "ok", "data": {"id": u.id, "username": u.username}}
 
 
 def _is_unsafe_proxy_target(url: str) -> str | None:
@@ -112,7 +195,7 @@ def _is_unsafe_proxy_target(url: str) -> str | None:
     return None
 
 
-@app.get("/proxy", dependencies=get_auth_dependency())
+@app.get("/proxy")
 async def proxy(url: str, request: Request, referer: str | None = None):
     """
     Stream remote content through this server.
@@ -170,8 +253,31 @@ async def proxy(url: str, request: Request, referer: str | None = None):
     )
 
 
-@app.get("/video/share/url/parse", dependencies=get_auth_dependency())
-async def share_url_parse(url: str):
+@app.get("/api/history")
+async def api_history_list(request: Request, limit: int = 50):
+    u = require_user(request)
+    items = list_history(user_id=u.id, limit=limit)
+    return {"code": 200, "msg": "ok", "data": items}
+
+
+@app.get("/api/history/{item_id}")
+async def api_history_get(request: Request, item_id: int):
+    u = require_user(request)
+    item = get_history_item(user_id=u.id, item_id=item_id)
+    if not item:
+        return {"code": 404, "msg": "not found"}
+    return {"code": 200, "msg": "ok", "data": item}
+
+
+@app.delete("/api/history/{item_id}")
+async def api_history_delete(request: Request, item_id: int):
+    u = require_user(request)
+    ok = delete_history_item(user_id=u.id, item_id=item_id)
+    return {"code": 200 if ok else 404, "msg": "ok" if ok else "not found"}
+
+
+@app.get("/video/share/url/parse")
+async def share_url_parse(request: Request, url: str):
     url_reg = re.compile(r"http[s]?:\/\/[\w.-]+[\w\/-]*[\w.-]*\??[\w=&:\-\+\%]*[/]*")
     video_share_url = url_reg.search(url).group()
 
@@ -180,7 +286,19 @@ async def share_url_parse(url: str):
         from parser import parse_video_share_url
 
         video_info = await parse_video_share_url(video_share_url)
-        return {"code": 200, "msg": "解析成功", "data": video_info.__dict__}
+        data = jsonable_encoder(video_info)
+        kind = "video" if data.get("video_url") else "images"
+        title = data.get("title") or ""
+        u = get_current_user(request)
+        if u:
+            insert_history(
+                user_id=u.id,
+                share_url=video_share_url,
+                title=title,
+                kind=kind,
+                data=data,
+            )
+        return {"code": 200, "msg": "解析成功", "data": data}
     except ImportError as err:
         return {
             "code": 500,
@@ -193,7 +311,7 @@ async def share_url_parse(url: str):
         }
 
 
-@app.get("/video/id/parse", dependencies=get_auth_dependency())
+@app.get("/video/id/parse")
 async def video_id_parse(source: str, video_id: str):
     try:
         # Lazy import: same reason as share_url_parse
