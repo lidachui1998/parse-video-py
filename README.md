@@ -151,6 +151,18 @@ docker build -t parse-video-py:local <你的仓库地址>
 docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped parse-video-py:local
 ```
 
+### 不装 Docker：用 GitHub Actions 自动构建镜像（推荐）
+项目已提供 `.github/workflows/docker-ghcr.yml`，你 push 到 `main/master` 后会自动构建并推送到 GHCR：
+
+- 镜像地址：`ghcr.io/<你的GitHub用户名>/<你的仓库名>:latest`
+
+在有 Docker 的服务器上部署：
+
+```bash
+docker pull ghcr.io/<你的GitHub用户名>/<你的仓库名>:latest
+docker run -d --name parse-video-py -p 8000:8000 --restart unless-stopped ghcr.io/<你的GitHub用户名>/<你的仓库名>:latest
+```
+
 # 查看前端页面
 访问: http://127.0.0.1:8000/
 
